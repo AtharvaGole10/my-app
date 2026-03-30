@@ -1,39 +1,41 @@
 import { useState, useEffect } from "react"
+import { db, collection, addDoc, getDocs, deleteDoc, doc, updateDoc } from "./firebase"
 
 export default function TodoApp() {
   const [todos, setTodos] = useState([])
   const [input, setInput] = useState("")
 
-  // Fetch todos from backend when app loads
+  // Load todos from Firebase on startup
   useEffect(() => {
-    fetch("http://localhost:5000/todos")
-      .then(res => res.json())
-      .then(data => setTodos(data))
+    const fetchTodos = async () => {
+      const snapshot = await getDocs(collection(db, "todos"))
+      const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() }))
+      setTodos(data)
+    }
+    fetchTodos()
   }, [])
 
-  // Add todo — saves to backend
+  // Add todo to Firebase
   const addTodo = async () => {
     if (input.trim() === "") return
-    const res = await fetch("http://localhost:5000/todos", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ task: input })
+    const docRef = await addDoc(collection(db, "todos"), {
+      task: input,
+      done: false
     })
-    const newTodo = await res.json()
-    setTodos([...todos, newTodo])
+    setTodos([...todos, { id: docRef.id, task: input, done: false }])
     setInput("")
   }
 
-  // Delete todo — removes from backend
+  // Delete todo from Firebase
   const deleteTodo = async (id) => {
-    await fetch(`http://localhost:5000/todos/${id}`, {
-      method: "DELETE"
-    })
+    await deleteDoc(doc(db, "todos", id))
     setTodos(todos.filter(t => t.id !== id))
   }
 
-  // Toggle done — local only for now
-  const toggleTodo = (id) => {
+  // Toggle done — saves to Firebase
+const toggleTodo = async (id, currentDone) => {
+    const todoRef = doc(db, "todos", id)
+    await updateDoc(todoRef, { done: !currentDone })
     setTodos(todos.map(t =>
       t.id === id ? { ...t, done: !t.done } : t
     ))
@@ -79,7 +81,7 @@ export default function TodoApp() {
               <input
                 type="checkbox"
                 checked={todo.done}
-                onChange={() => toggleTodo(todo.id)}
+                onChange={() => toggleTodo(todo.id, todo.done)}
                 className="w-4 h-4 accent-purple-500 cursor-pointer"
               />
               <span className={`flex-1 text-sm ${todo.done ? "line-through text-gray-300" : "text-gray-700"}`}>
