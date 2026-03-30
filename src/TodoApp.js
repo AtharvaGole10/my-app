@@ -1,24 +1,42 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 
 export default function TodoApp() {
   const [todos, setTodos] = useState([])
   const [input, setInput] = useState("")
 
-  const addTodo = () => {
+  // Fetch todos from backend when app loads
+  useEffect(() => {
+    fetch("http://localhost:5000/todos")
+      .then(res => res.json())
+      .then(data => setTodos(data))
+  }, [])
+
+  // Add todo — saves to backend
+  const addTodo = async () => {
     if (input.trim() === "") return
-    setTodos([...todos, { task: input, done: false }])
+    const res = await fetch("http://localhost:5000/todos", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ task: input })
+    })
+    const newTodo = await res.json()
+    setTodos([...todos, newTodo])
     setInput("")
   }
 
-  const toggleTodo = (index) => {
-    const updated = todos.map((todo, i) =>
-      i === index ? { ...todo, done: !todo.done } : todo
-    )
-    setTodos(updated)
+  // Delete todo — removes from backend
+  const deleteTodo = async (id) => {
+    await fetch(`http://localhost:5000/todos/${id}`, {
+      method: "DELETE"
+    })
+    setTodos(todos.filter(t => t.id !== id))
   }
 
-  const deleteTodo = (index) => {
-    setTodos(todos.filter((_, i) => i !== index))
+  // Toggle done — local only for now
+  const toggleTodo = (id) => {
+    setTodos(todos.map(t =>
+      t.id === id ? { ...t, done: !t.done } : t
+    ))
   }
 
   const handleKey = (e) => {
@@ -36,7 +54,6 @@ export default function TodoApp() {
           {todos.filter(t => !t.done).length} tasks remaining
         </p>
 
-        {/* Input row */}
         <div className="flex gap-2 mb-6">
           <input
             value={input}
@@ -53,24 +70,23 @@ export default function TodoApp() {
           </button>
         </div>
 
-        {/* Todo list */}
         <div className="flex flex-col gap-2">
-          {todos.map((todo, index) => (
+          {todos.map((todo) => (
             <div
-              key={index}
+              key={todo.id}
               className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:border-gray-200 transition"
             >
               <input
                 type="checkbox"
                 checked={todo.done}
-                onChange={() => toggleTodo(index)}
+                onChange={() => toggleTodo(todo.id)}
                 className="w-4 h-4 accent-purple-500 cursor-pointer"
               />
               <span className={`flex-1 text-sm ${todo.done ? "line-through text-gray-300" : "text-gray-700"}`}>
                 {todo.task}
               </span>
               <button
-                onClick={() => deleteTodo(index)}
+                onClick={() => deleteTodo(todo.id)}
                 className="text-gray-300 hover:text-red-400 transition text-lg"
               >
                 ✕
@@ -79,7 +95,6 @@ export default function TodoApp() {
           ))}
         </div>
 
-        {/* Empty state */}
         {todos.length === 0 && (
           <p className="text-center text-gray-300 text-sm mt-8">
             No tasks yet. Add one above!
